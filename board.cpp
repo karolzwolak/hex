@@ -5,7 +5,7 @@
 #include <cstring>
 #include <iostream>
 
-#define MAX_LINE_LEN 65
+#define MAX_LINE_LEN 70
 
 int Position::as_index(const int board_size) {
   int sum;
@@ -38,26 +38,27 @@ void Position::neighbors(Position (&arr_out)[6]) {
 }
 
 Board::Board() : size(MAX_SIZE), cells(nullptr), red_count(0), blue_count(0) {
-  cells = (Player *)calloc(size * size, sizeof(Player));
+  // cells = (Player *)calloc(size * size, sizeof(Player));
+  cells = (Player *)malloc(size * size * sizeof(Player));
   assert(cells);
 }
 Board::~Board() { free(cells); }
 
 void Board::resize(int new_size) {
   size = new_size;
-  cells = (Player *)realloc(cells, size * size * sizeof(Player));
-  assert(cells);
+  // cells = (Player *)realloc(cells, size * size * sizeof(Player));
+  // assert(cells);
 }
 
+// assumes first line "---" is consumed
 void Board::parse_from_stdin() {
   char buffer[MAX_LINE_LEN];
   int next_id = 0;
-  // skip ---
-  std::cin.getline(buffer, sizeof(buffer));
 
   std::cin.getline(buffer, sizeof(buffer));
-  while (strcmp(buffer, "---") != 0) {
+  while (strcmp(buffer, " ---") != 0) {
     int len = strlen(buffer);
+    int cell_count = 0;
 
     for (int i = 0; i < len; i++) {
       if (buffer[i] != '<') {
@@ -86,9 +87,13 @@ void Board::parse_from_stdin() {
       }
       cells[next_id] = p;
       next_id++;
+      cell_count++;
     }
 
     std::cin.getline(buffer, sizeof(buffer));
+    if (next_id > 1 && cell_count == 1) {
+      break;
+    }
   }
 
   resize(sqrt(next_id));
