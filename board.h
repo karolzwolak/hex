@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #define FIRST RED
 #define SECOND BLUE
 #define MAX_SIZE 11
@@ -31,15 +32,13 @@ struct Position {
 //
 struct Board {
   int size;
-  Player *cells;
+  std::vector<Player> cells;
   int red_count;
   int blue_count;
 
   // we just assume every board is of max size
   // after, parsing the input, we will shrink it
   Board();
-
-  ~Board();
 
   void resize(int new_size);
   void parse_from_stdin();

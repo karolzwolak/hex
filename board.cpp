@@ -1,5 +1,4 @@
 #include "board.h"
-#include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -37,18 +36,9 @@ void Position::neighbors(Position (&arr_out)[6]) {
   arr_out[5] = Position{depth + 1, offset + 1};
 }
 
-Board::Board() : size(MAX_SIZE), cells(nullptr), red_count(0), blue_count(0) {
-  // cells = (Player *)calloc(size * size, sizeof(Player));
-  cells = (Player *)malloc(size * size * sizeof(Player));
-  assert(cells);
-}
-Board::~Board() { free(cells); }
+Board::Board() : size(MAX_SIZE), cells({}), red_count(0), blue_count(0) {}
 
-void Board::resize(int new_size) {
-  size = new_size;
-  // cells = (Player *)realloc(cells, size * size * sizeof(Player));
-  // assert(cells);
-}
+void Board::resize(int new_size) { size = new_size; }
 
 // assumes first line "---" is consumed
 void Board::parse_from_stdin() {
@@ -85,7 +75,7 @@ void Board::parse_from_stdin() {
         exit(1);
         break;
       }
-      cells[next_id] = p;
+      cells.push_back(p);
       next_id++;
       cell_count++;
     }
