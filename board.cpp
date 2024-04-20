@@ -43,13 +43,13 @@ void Position::neighbors(Position (&arr_out)[6]) {
 }
 bool Position::is_dest_side(const int board_size, const Player player) {
   int expected_offset = player == RED ? depth % board_size : 0;
-  return depth >= board_size && depth < 2 * (board_size - 1) &&
+  return depth + 1 >= board_size && depth <= 2 * (board_size - 1) &&
          offset == expected_offset;
 }
 
 bool Position::is_start_side(const int board_size, const Player player) {
   int expected_offset = player == RED ? 0 : depth;
-  return depth > 0 && depth + 1 < board_size && offset == expected_offset;
+  return depth >= 0 && depth + 1 <= board_size && offset == expected_offset;
 }
 
 Board::Board() : size(MAX_SIZE), cells({}), red_count(0), blue_count(0) {}
@@ -116,14 +116,13 @@ int Board::player_count(const Player player) {
   assert(player != NONE);
   return player == RED ? red_count : blue_count;
 }
-
-bool Board::is_player_connected(const Player player) {
-  assert(player != NONE);
-  std::vector<bool> visited(size * size, false);
-  std::vector<Position> pos_stack;
+void Board::dfs_populate_start_side(const Player player,
+                                    std::vector<bool> &visited,
+                                    std::vector<Position> &pos_stack) {
   pos_stack.reserve(player_count(player));
+  assert(size > 1);
 
-  for (int d = 1; d < size; d++) {
+  for (int d = 0; d <= size; d++) {
     int offset = player == RED ? 0 : d;
     Position pos = Position{d, offset};
     int id = pos.as_index(size);
@@ -135,6 +134,18 @@ bool Board::is_player_connected(const Player player) {
     visited[id] = true;
     pos_stack.push_back(pos);
   }
+}
+
+bool Board::is_player_connected(const Player player) {
+  assert(player != NONE);
+  if (size == 1) {
+    return cells[0] == player;
+  }
+
+  std::vector<bool> visited(size * size, false);
+  std::vector<Position> pos_stack;
+
+  dfs_populate_start_side(player, visited, pos_stack);
 
   while (!pos_stack.empty()) {
     Position pos = pos_stack.back();
@@ -160,24 +171,16 @@ bool Board::is_player_connected(const Player player) {
 }
 int Board::player_connection_count(const Player player) {
   assert(player != NONE);
+  if (size == 1) {
+    return cells[0] == player;
+  }
+
   std::vector<bool> visited(size * size, false);
   std::vector<Position> pos_stack;
-  pos_stack.reserve(player_count(player));
+
+  dfs_populate_start_side(player, visited, pos_stack);
 
   int connections = 0;
-
-  for (int d = 1; d < size; d++) {
-    int offset = player == RED ? 0 : d;
-    Position pos = Position{d, offset};
-    int id = pos.as_index(size);
-
-    if (cells[id] != player) {
-      continue;
-    }
-
-    visited[id] = true;
-    pos_stack.push_back(pos);
-  }
 
   bool new_con = true;
   while (!pos_stack.empty()) {
@@ -206,4 +209,45 @@ int Board::player_connection_count(const Player player) {
   }
 
   return connections;
+}
+
+Player Board::curr_turn() {
+  if (red_count == blue_count || blue_count > red_count) {
+    return RED;
+  }
+  return BLUE;
+}
+
+bool Board::is_board_correct() {
+  // because red starts, blue can't have more pawns than red
+  return red_count == blue_count || blue_count + 1 == red_count;
+}
+
+Player Board::winner() {
+  if (!is_board_correct()) {
+    return NONE;
+  }
+  bool red_won = is_player_connected(RED);
+  bool blue_won = is_player_connected(BLUE);
+
+  if (red_won && blue_won) {
+    return NONE;
+  }
+  if (red_won) {
+    return RED;
+  }
+  if (blue_won) {
+    return BLUE;
+  }
+  return NONE;
+}
+
+bool Board::is_board_possible() {
+  if (!is_board_correct()) {
+    return false;
+  }
+  int red_con = player_connection_count(RED);
+  int blue_con = player_connection_count(BLUE);
+
+  return red_con + blue_con <= 1;
 }

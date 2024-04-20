@@ -47,6 +47,15 @@ struct Board {
   void resize(int new_size);
   void parse_from_stdin();
 
+  int player_count(const Player player);
+  Player curr_turn();
+
+  bool is_board_correct();
+  Player winner();
+  bool is_board_possible();
+
+  void dfs_populate_start_side(const Player player, std::vector<bool> &visited,
+                               std::vector<Position> &pos_stack);
   bool is_player_connected(const Player player);
   int player_connection_count(const Player player);
 };
