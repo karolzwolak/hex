@@ -15,10 +15,12 @@ struct Position {
   int depth, offset;
 
   bool is_valid(const int board_size);
-  // assumes the index is valid
   int as_index(const int board_size);
   // writes all 6 cell neighbors, regardless if they are valid
   void neighbors(Position (&arr_out)[6]);
+
+  bool is_dest_side(const int board_size, const Player player);
+  bool is_start_side(const int board_size, const Player player);
 };
 
 // SIZE * size hexagonal board
@@ -40,6 +42,11 @@ struct Board {
   // after, parsing the input, we will shrink it
   Board();
 
+  // deep copy
+  Board(const Board &other);
   void resize(int new_size);
   void parse_from_stdin();
+
+  bool is_player_connected(const Player player);
+  int player_connection_count(const Player player);
 };
