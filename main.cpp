@@ -4,16 +4,42 @@
 
 #define MAX_LINE_LEN 70
 
+void print_bool(bool val) {
+  if (val)
+    std::cout << "YES";
+  else
+    std::cout << "NO";
+}
+
 void command(Board &board, char *cmd) {
   if (cmd[0] == '\0') {
     return;
   }
-  std::cout << "cmd: " << cmd << "\n";
+  // std::cout << "cmd: " << cmd << "\n";
 
   if (strcmp(cmd, "BOARD_SIZE") == 0) {
-    std::cout << board.size << "\n";
+    std::cout << board.size;
+  } else if (strcmp(cmd, "PAWNS_NUMBER") == 0) {
+    std::cout << board.red_count + board.blue_count;
   } else if (strcmp(cmd, "IS_BOARD_CORRECT") == 0) {
+    print_bool(board.is_board_correct());
+  } else if (strcmp(cmd, "IS_GAME_OVER") == 0) {
+    Player winner = board.winner();
+    switch (winner) {
+    case NONE:
+      std::cout << "NO";
+      break;
+    case RED:
+      std::cout << "YES RED";
+      break;
+    case BLUE:
+      std::cout << "YES BLUE";
+      break;
+    }
+  } else if (strcmp(cmd, "IS_BOARD_POSSIBLE") == 0) {
+    print_bool(board.is_board_possible());
   }
+  std::cout << '\n';
 }
 
 void run_once(Board &board) {

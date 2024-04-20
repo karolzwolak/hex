@@ -8,51 +8,7 @@
 
 #define MAX_LINE_LEN 70
 
-#include <cassert>
-int Position::as_index(const int board_size) {
-  if (!is_valid(board_size)) {
-    return -1;
-  }
-  int sum;
-  int offset = this->offset;
-  if (depth >= board_size) {
-    int depth = this->depth % board_size;
-    sum = -((float)depth / 2) * (depth + 1);
-    offset += board_size * board_size - 1;
-  } else {
-    sum = ((float)depth / 2) * (depth + 1);
-  }
-
-  return sum + offset;
-}
-
-bool Position::is_valid(int board_size) {
-  bool depth_correct = 0 <= depth && depth <= 2 * (board_size - 1) + 1;
-  bool offset_correct = 0 <= offset && offset <= depth % board_size;
-  return depth_correct && offset_correct;
-}
-void Position::neighbors(Position (&arr_out)[6]) {
-  arr_out[0] = Position{depth - 1, offset - 1};
-  arr_out[1] = Position{depth - 1, offset};
-
-  arr_out[2] = Position{depth, offset - 1};
-  arr_out[3] = Position{depth, offset + 1};
-
-  arr_out[4] = Position{depth + 1, offset};
-  arr_out[5] = Position{depth + 1, offset + 1};
-}
-bool Position::is_dest_side(const int board_size, const Player player) {
-  int expected_offset = player == RED ? depth % board_size : 0;
-  return depth + 1 >= board_size && depth <= 2 * (board_size - 1) &&
-         offset == expected_offset;
-}
-
-bool Position::is_start_side(const int board_size, const Player player) {
-  int expected_offset = player == RED ? 0 : depth;
-  return depth >= 0 && depth + 1 <= board_size && offset == expected_offset;
-}
-
-Board::Board() : size(MAX_SIZE), cells({}), red_count(0), blue_count(0) {}
+Board::Board() : size(0), cells({}), red_count(0), blue_count(0) {}
 
 Board::Board(const Board &other) {
   size = other.size;
@@ -61,12 +17,17 @@ Board::Board(const Board &other) {
   blue_count = other.blue_count;
 }
 
-void Board::resize(int new_size) { size = new_size; }
+void Board::reset() {
+  red_count = 0;
+  blue_count = 0;
+}
 
 // assumes first line "---" is consumed
 void Board::parse_from_stdin() {
+  reset();
+
+  std::vector<Player> new_cells;
   char buffer[MAX_LINE_LEN];
-  int next_id = 0;
 
   std::cin.getline(buffer, sizeof(buffer));
   while (strcmp(buffer, " ---") != 0) {
@@ -98,117 +59,215 @@ void Board::parse_from_stdin() {
         exit(1);
         break;
       }
-      cells.push_back(p);
-      next_id++;
+      new_cells.push_back(p);
       cell_count++;
     }
 
     std::cin.getline(buffer, sizeof(buffer));
-    if (next_id > 1 && cell_count == 1) {
+    if (new_cells.size() > 1 && cell_count == 1) {
       break;
     }
   }
 
-  resize(sqrt(next_id));
+  cells.resize(new_cells.size());
+  size = sqrt(new_cells.size());
+
+  int max_depth = 2 * (size - 1);
+  int id = 0;
+  for (int depth = 0; depth <= max_depth; depth++) {
+    int max_offset = depth + 1 >= size ? max_depth - depth : depth;
+
+    int flat_id;
+    if (depth >= size) {
+      flat_id = size * (size - 1) + (depth - size + 1);
+    } else {
+      flat_id = depth * size;
+    }
+
+    for (int offset = 0; offset <= max_offset; offset++) {
+      cells[flat_id] = new_cells[id];
+
+      flat_id -= size - 1;
+      id++;
+    }
+  }
 }
 
 int Board::player_count(const Player player) {
   assert(player != NONE);
   return player == RED ? red_count : blue_count;
 }
-void Board::dfs_populate_start_side(const Player player,
-                                    std::vector<bool> &visited,
-                                    std::vector<Position> &pos_stack) {
-  pos_stack.reserve(player_count(player));
-  assert(size > 1);
+int Board::is_id_dest_side(const int id, const Player player) {
+  int col = id % size;
+  int row = id / size;
 
-  for (int d = 0; d <= size; d++) {
-    int offset = player == RED ? 0 : d;
-    Position pos = Position{d, offset};
-    int id = pos.as_index(size);
+  if (player == RED) {
+    return col == size - 1;
+  }
+  return row == size - 1;
+}
+int Board::is_id_start_side(const int id, const Player player) {
+  int col = id % size;
+  int row = id / size;
+  if (player == RED) {
+    return col == 0;
+  }
+  return row == 0;
+}
+bool Board::is_pos_valid(const int row, const int col) {
+  return row >= 0 && row < size && col >= 0 && col < size;
+}
+int Board::neighbors(const int id, int (&arr_out)[6]) {
+  int count = 0;
+  int col = id % size;
+  int row = id / size;
+  if (is_pos_valid(row, col + 1)) {
+    arr_out[count] = id + 1;
+    count++;
+  }
+  if (is_pos_valid(row, col - 1)) {
+    arr_out[count] = id - 1;
+    count++;
+  }
+  if (is_pos_valid(row + 1, col)) {
+    arr_out[count] = id + size;
+    count++;
+  }
+  if (is_pos_valid(row - 1, col)) {
+    arr_out[count] = id - size;
+    count++;
+  }
+  if (is_pos_valid(row + 1, col + 1)) {
+    arr_out[count] = id + size + 1;
+    count++;
+  }
+  if (is_pos_valid(row - 1, col - 1)) {
+    arr_out[count] = id - size - 1;
+    count++;
+  }
+  return count;
+}
+int Board::player_connected_count(const Player player) {
+  assert(player != NONE);
+  if (size == 1) {
+    return cells[0] == player;
+  }
+  std::vector<bool> visited(size * size, false);
+  std::vector<int> id_stack;
+  id_stack.reserve(player_count(player));
+
+  int connections = 0;
+
+  for (int i = 0; i < size; i++) {
+    int row, col;
+    if (player == RED) {
+      col = 0;
+      row = i;
+    } else {
+      col = i;
+      row = 0;
+    }
+    int id = row * size + col;
 
     if (cells[id] != player) {
       continue;
     }
 
-    visited[id] = true;
-    pos_stack.push_back(pos);
+    connections += player_connected_at(player, id, visited, id_stack);
   }
+  return connections;
 }
 
-bool Board::is_player_connected(const Player player) {
-  assert(player != NONE);
-  if (size == 1) {
-    return cells[0] == player;
-  }
+bool Board::player_connected_at(const Player player, const int id,
+                                std::vector<bool> &visited,
+                                std::vector<int> &id_stack) {
+  visited[id] = true;
+  id_stack.push_back(id);
+  bool connected = false;
 
-  std::vector<bool> visited(size * size, false);
-  std::vector<Position> pos_stack;
+  while (!id_stack.empty()) {
+    int id = id_stack.back();
+    id_stack.pop_back();
 
-  dfs_populate_start_side(player, visited, pos_stack);
+    if (is_id_dest_side(id, player)) {
+      connected = true;
+    }
 
-  while (!pos_stack.empty()) {
-    Position pos = pos_stack.back();
-    pos_stack.pop_back();
-
-    Position adj[6];
-    pos.neighbors(adj);
-    for (int i = 0; i < 6; i++) {
-      int id = adj[i].as_index(size);
-      if (id == -1 || visited[id] || cells[id] != player) {
+    int adj[6];
+    int n_count = neighbors(id, adj);
+    for (int i = 0; i < n_count; i++) {
+      int n = adj[i];
+      if (visited[n] || cells[n] != player) {
         continue;
-      }
-      if (pos.is_dest_side(size, player)) {
-        return true;
       }
 
       visited[id] = true;
-      pos_stack.push_back(adj[i]);
+      id_stack.push_back(n);
     }
   }
 
+  return connected;
+}
+bool Board::check_connected_cycle_at_id(const Player player, const int id,
+                                        const int parent, bool connected,
+                                        std::vector<bool> &visited) {
+  visited[id] = true;
+
+  if (is_id_dest_side(id, player)) {
+    connected = true;
+  }
+
+  int adj[6];
+  int n_count = neighbors(size, adj);
+  for (int i = 0; i < n_count; i++) {
+    int n = adj[i];
+    if (cells[n] != player) {
+      continue;
+    }
+    bool res = false;
+    if (!visited[n]) {
+      res = check_connected_cycle_at_id(player, n, id, connected, visited);
+    } else if (n != parent && connected && is_id_start_side(n, player)) {
+      res = true;
+    }
+    if (res) {
+      return true;
+    }
+  }
   return false;
 }
-int Board::player_connection_count(const Player player) {
+bool Board::check_connected_cycle(const Player player) {
   assert(player != NONE);
   if (size == 1) {
     return cells[0] == player;
   }
 
   std::vector<bool> visited(size * size, false);
-  std::vector<Position> pos_stack;
+  std::vector<int> pos_stack;
 
-  dfs_populate_start_side(player, visited, pos_stack);
+  pos_stack.reserve(player_count(player));
+  assert(size > 1);
 
-  int connections = 0;
+  for (int i = 0; i < size; i++) {
+    int row, col;
+    if (player == RED) {
+      col = 0;
+      row = i;
+    } else {
+      col = i;
+      row = 0;
+    }
+    int id = row * size + col;
 
-  bool new_con = true;
-  while (!pos_stack.empty()) {
-    Position pos = pos_stack.back();
-    pos_stack.pop_back();
-
-    if (pos.is_start_side(size, player)) {
-      new_con = true;
+    if (cells[id] != player || visited[id]) {
+      continue;
     }
 
-    Position adj[6];
-    pos.neighbors(adj);
-    for (int i = 0; i < 6; i++) {
-      int id = adj[i].as_index(size);
-      if (id == -1 || visited[id] || cells[id] != player) {
-        continue;
-      }
-      if (pos.is_dest_side(size, player) && new_con) {
-        connections++;
-        new_con = false;
-      }
-
-      visited[id] = true;
-      pos_stack.push_back(adj[i]);
+    if (check_connected_cycle_at_id(player, id, -1, false, visited)) {
+      return true;
     }
   }
-
-  return connections;
+  return false;
 }
 
 Player Board::curr_turn() {
@@ -227,8 +286,8 @@ Player Board::winner() {
   if (!is_board_correct()) {
     return NONE;
   }
-  bool red_won = is_player_connected(RED);
-  bool blue_won = is_player_connected(BLUE);
+  bool red_won = player_connected_count(RED) > 0;
+  bool blue_won = player_connected_count(BLUE) > 0;
 
   if (red_won && blue_won) {
     return NONE;
@@ -246,8 +305,14 @@ bool Board::is_board_possible() {
   if (!is_board_correct()) {
     return false;
   }
-  int red_con = player_connection_count(RED);
-  int blue_con = player_connection_count(BLUE);
+  bool red_cycle = check_connected_cycle(RED);
+  bool blue_cycle = check_connected_cycle(BLUE);
 
-  return red_con + blue_con <= 1;
+  int red_con = player_connected_count(RED);
+  int blue_con = player_connected_count(BLUE);
+  std::cout << "red_con: " << red_con << " blue_con: " << blue_con << "\n";
+  std::cout << "red_cycle: " << red_cycle << " blue_cycle: " << blue_cycle
+            << "\n";
+
+  return red_con + blue_con <= 1 || red_cycle || blue_cycle;
 }

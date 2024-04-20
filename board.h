@@ -11,18 +11,6 @@ enum Player {
   BLUE,
 };
 
-struct Position {
-  int depth, offset;
-
-  bool is_valid(const int board_size);
-  int as_index(const int board_size);
-  // writes all 6 cell neighbors, regardless if they are valid
-  void neighbors(Position (&arr_out)[6]);
-
-  bool is_dest_side(const int board_size, const Player player);
-  bool is_start_side(const int board_size, const Player player);
-};
-
 // SIZE * size hexagonal board
 //
 // example 3x3 board:
@@ -45,6 +33,7 @@ struct Board {
   // deep copy
   Board(const Board &other);
   void resize(int new_size);
+  void reset();
   void parse_from_stdin();
 
   int player_count(const Player player);
@@ -54,8 +43,19 @@ struct Board {
   Player winner();
   bool is_board_possible();
 
-  void dfs_populate_start_side(const Player player, std::vector<bool> &visited,
-                               std::vector<Position> &pos_stack);
-  bool is_player_connected(const Player player);
-  int player_connection_count(const Player player);
+  bool is_pos_valid(const int row, const int col);
+  int neighbors(const int id, int (&arr_out)[6]);
+
+  int is_id_dest_side(const int id, const Player player);
+  int is_id_start_side(const int id, const Player player);
+
+  int player_connected_count(const Player player);
+  bool player_connected_at(const Player player, const int id,
+                           std::vector<bool> &visited,
+                           std::vector<int> &id_stack);
+
+  bool check_connected_cycle(const Player player);
+  bool check_connected_cycle_at_id(const Player player, const int id,
+                                   const int parent, bool connected,
+                                   std::vector<bool> &visited);
 };
