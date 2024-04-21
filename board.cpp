@@ -218,7 +218,7 @@ bool Board::check_connected_cycle_at_id(const Player player, const int id,
   }
 
   int adj[6];
-  int n_count = neighbors(size, adj);
+  int n_count = neighbors(id, adj);
   for (int i = 0; i < n_count; i++) {
     int n = adj[i];
     if (cells[n] != player) {
@@ -310,9 +310,10 @@ bool Board::is_board_possible() {
 
   int red_con = player_connected_count(RED);
   int blue_con = player_connected_count(BLUE);
-  std::cout << "red_con: " << red_con << " blue_con: " << blue_con << "\n";
-  std::cout << "red_cycle: " << red_cycle << " blue_cycle: " << blue_cycle
-            << "\n";
+  /* std::cout << "red_con: " << red_con << " blue_con: " << blue_con << "\n";
+   */
+  /* std::cout << "red_cycle: " << red_cycle << " blue_cycle: " << blue_cycle */
+  /*           << "\n"; */
 
-  return red_con + blue_con <= 1 || red_cycle || blue_cycle;
+  return red_con + blue_con <= 1 && !red_cycle && !blue_cycle;
 }
