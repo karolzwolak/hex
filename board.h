@@ -49,13 +49,9 @@ struct Board {
   int is_id_dest_side(const int id, const Player player);
   int is_id_start_side(const int id, const Player player);
 
-  int player_connected_count(const Player player);
-  bool player_connected_at(const Player player, const int id,
-                           std::vector<bool> &visited,
-                           std::vector<int> &id_stack);
-
-  bool check_connected_cycle(const Player player);
-  bool check_connected_cycle_at_id(const Player player, const int id,
-                                   const int parent, bool connected,
-                                   std::vector<bool> &visited);
+  bool is_player_connected_at(const Player player, const int id,
+                              std::vector<bool> &visited,
+                              std::vector<int> &id_stack);
+  bool is_player_connected(const Player player);
+  bool is_victory_legal(const Player player);
 };

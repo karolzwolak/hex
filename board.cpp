@@ -147,7 +147,7 @@ int Board::neighbors(const int id, int (&arr_out)[6]) {
   }
   return count;
 }
-int Board::player_connected_count(const Player player) {
+bool Board::is_player_connected(const Player player) {
   assert(player != NONE);
   if (size == 1) {
     return cells[0] == player;
@@ -155,8 +155,6 @@ int Board::player_connected_count(const Player player) {
   std::vector<bool> visited(size * size, false);
   std::vector<int> id_stack;
   id_stack.reserve(player_count(player));
-
-  int connections = 0;
 
   for (int i = 0; i < size; i++) {
     int row, col;
@@ -173,24 +171,24 @@ int Board::player_connected_count(const Player player) {
       continue;
     }
 
-    connections += player_connected_at(player, id, visited, id_stack);
+    if (is_player_connected_at(player, id, visited, id_stack))
+      return true;
   }
-  return connections;
+  return false;
 }
 
-bool Board::player_connected_at(const Player player, const int id,
-                                std::vector<bool> &visited,
-                                std::vector<int> &id_stack) {
+bool Board::is_player_connected_at(const Player player, const int id,
+                                   std::vector<bool> &visited,
+                                   std::vector<int> &id_stack) {
   visited[id] = true;
   id_stack.push_back(id);
-  bool connected = false;
 
   while (!id_stack.empty()) {
     int id = id_stack.back();
     id_stack.pop_back();
 
     if (is_id_dest_side(id, player)) {
-      connected = true;
+      return true;
     }
 
     int adj[6];
@@ -206,67 +204,6 @@ bool Board::player_connected_at(const Player player, const int id,
     }
   }
 
-  return connected;
-}
-bool Board::check_connected_cycle_at_id(const Player player, const int id,
-                                        const int parent, bool connected,
-                                        std::vector<bool> &visited) {
-  visited[id] = true;
-
-  if (is_id_dest_side(id, player)) {
-    connected = true;
-  }
-
-  int adj[6];
-  int n_count = neighbors(id, adj);
-  for (int i = 0; i < n_count; i++) {
-    int n = adj[i];
-    if (cells[n] != player) {
-      continue;
-    }
-    bool res = false;
-    if (!visited[n]) {
-      res = check_connected_cycle_at_id(player, n, id, connected, visited);
-    } else if (n != parent && connected && is_id_start_side(n, player)) {
-      res = true;
-    }
-    if (res) {
-      return true;
-    }
-  }
-  return false;
-}
-bool Board::check_connected_cycle(const Player player) {
-  assert(player != NONE);
-  if (size == 1) {
-    return cells[0] == player;
-  }
-
-  std::vector<bool> visited(size * size, false);
-  std::vector<int> pos_stack;
-
-  pos_stack.reserve(player_count(player));
-  assert(size > 1);
-
-  for (int i = 0; i < size; i++) {
-    int row, col;
-    if (player == RED) {
-      col = 0;
-      row = i;
-    } else {
-      col = i;
-      row = 0;
-    }
-    int id = row * size + col;
-
-    if (cells[id] != player || visited[id]) {
-      continue;
-    }
-
-    if (check_connected_cycle_at_id(player, id, -1, false, visited)) {
-      return true;
-    }
-  }
   return false;
 }
 
@@ -286,8 +223,8 @@ Player Board::winner() {
   if (!is_board_correct()) {
     return NONE;
   }
-  bool red_won = player_connected_count(RED) > 0;
-  bool blue_won = player_connected_count(BLUE) > 0;
+  bool red_won = is_player_connected(RED);
+  bool blue_won = is_player_connected(BLUE);
 
   if (red_won && blue_won) {
     return NONE;
@@ -301,19 +238,60 @@ Player Board::winner() {
   return NONE;
 }
 
+bool Board::is_victory_legal(const Player player) {
+  assert(player != NONE);
+  int &player_count = player == RED ? red_count : blue_count;
+  player_count--;
+
+  for (int row = 0; row < size; row++) {
+    for (int col = 0; col < size; col++) {
+      int id = row * size + col;
+      if (cells[id] != player) {
+        continue;
+      }
+      cells[id] = NONE;
+
+      if (!is_player_connected(player)) {
+        cells[id] = player;
+        player_count++;
+        return true;
+      }
+
+      cells[id] = player;
+    }
+  }
+  player_count++;
+  return false;
+}
+
 bool Board::is_board_possible() {
   if (!is_board_correct()) {
     return false;
   }
-  bool red_cycle = check_connected_cycle(RED);
-  bool blue_cycle = check_connected_cycle(BLUE);
+  if (red_count + blue_count == 1 && red_count != 1) {
+    return false;
+  }
+  bool red_won = is_player_connected(RED);
+  bool blue_won = is_player_connected(BLUE);
 
-  int red_con = player_connected_count(RED);
-  int blue_con = player_connected_count(BLUE);
-  /* std::cout << "red_con: " << red_con << " blue_con: " << blue_con << "\n";
-   */
-  /* std::cout << "red_cycle: " << red_cycle << " blue_cycle: " << blue_cycle */
-  /*           << "\n"; */
+  if (!red_won && !blue_won) {
+    return true;
+  }
 
-  return red_con + blue_con <= 1 && !red_cycle && !blue_cycle;
+  if (red_won && blue_won)
+    return false;
+
+  if (red_won && !is_victory_legal(RED))
+    return false;
+  if (blue_won && !is_victory_legal(BLUE))
+    return false;
+
+  if (red_won && red_count != blue_count + 1)) {
+      return false;
+  }
+  if (blue_won && red_count != blue_count) {
+    return false;
+  }
+
+  return true;
 }
