@@ -1,8 +1,10 @@
 #include "board.h"
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 
 #define MAX_LINE_LEN 70
+#define DEBUG false
 
 void print_bool(bool val) {
   if (val)
@@ -11,11 +13,17 @@ void print_bool(bool val) {
     std::cout << "NO";
 }
 
+bool string_startswith(const char *str, const char *prefix) {
+  return strncmp(str, prefix, strlen(prefix)) == 0;
+}
+
 void command(Board &board, char *cmd) {
   if (cmd[0] == '\0') {
     return;
   }
-  // std::cout << "cmd: " << cmd << "\n";
+  if (DEBUG) {
+    std::cout << "c: " << cmd << ": ";
+  }
 
   if (strcmp(cmd, "BOARD_SIZE") == 0) {
     std::cout << board.size;
@@ -38,10 +46,40 @@ void command(Board &board, char *cmd) {
     }
   } else if (strcmp(cmd, "IS_BOARD_POSSIBLE") == 0) {
     print_bool(board.is_board_possible());
-  }
-  std::cout << '\n';
-}
+  } else if (string_startswith(cmd, "CAN_")) {
+    Player player;
+    char player_str[MAX_LINE_LEN];
+    char opponent_str[MAX_LINE_LEN];
 
+    bool one_move = sscanf(cmd, "CAN_%[^_]_WIN_IN_1_MOVE_WITH_%[^_]_OPPONENT",
+                           player_str, opponent_str) == 2;
+    bool two_move = sscanf(cmd, "CAN_%[^_]_WIN_IN_2_MOVES_WITH_%[^_]_OPPONENT",
+                           player_str, opponent_str) == 2;
+    if (strcmp(player_str, "RED") == 0) {
+      player = RED;
+    } else if (strcmp(player_str, "BLUE") == 0) {
+      player = BLUE;
+    } else {
+      std::cerr << "Invalid player: " << player_str << "\n";
+      return;
+    }
+
+    bool perfect_op = strcmp(opponent_str, "PERFECT") == 0;
+
+    bool res = false;
+    if (one_move) {
+      res = board.can_player_win_in_one_move(player, perfect_op);
+    } else if (two_move) {
+      std::cout << "(unimplemented) ";
+      res = board.can_player_win_in_two_moves(player, perfect_op);
+    } else {
+      std::cerr << "Invalid command: " << cmd << "\n";
+      return;
+    }
+    std::cout << (int)res;
+  }
+  std::cout << "\n";
+}
 void run_once(Board &board) {
   board.parse_from_stdin();
 

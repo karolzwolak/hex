@@ -54,4 +54,12 @@ struct Board {
                               std::vector<int> &id_stack);
   bool is_player_connected(const Player player);
   bool is_victory_legal(const Player player);
+
+  int &curr_player_count();
+  bool can_player_win_in_one_move(const Player player, bool perfect_op);
+
+  bool can_player_win_in_one_move_p_turn(const Player player);
+  bool can_player_win_in_one_move_op_turn(const Player player, bool perfect_op);
+
+  bool can_player_win_in_two_moves(const Player player, bool perfect_op);
 };

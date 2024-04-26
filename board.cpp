@@ -8,6 +8,16 @@
 
 #define MAX_LINE_LEN 70
 
+Player opposite_player(Player player) {
+  if (player == RED) {
+    return BLUE;
+  }
+  if (player == BLUE) {
+    return RED;
+  }
+  return NONE;
+}
+
 Board::Board() : size(0), cells({}), red_count(0), blue_count(0) {}
 
 Board::Board(const Board &other) {
@@ -286,12 +296,96 @@ bool Board::is_board_possible() {
   if (blue_won && !is_victory_legal(BLUE))
     return false;
 
-  if (red_won && red_count != blue_count + 1)) {
-      return false;
+  if (red_won && red_count != blue_count + 1) {
+    return false;
   }
   if (blue_won && red_count != blue_count) {
     return false;
   }
 
   return true;
+}
+int &Board::curr_player_count() {
+  return curr_turn() == RED ? red_count : blue_count;
+}
+
+bool Board::can_player_win_in_one_move_p_turn(const Player player) {
+  for (int row = 0; row < size; row++) {
+    for (int col = 0; col < size; col++) {
+      int id = row * size + col;
+      if (cells[id] != NONE) {
+        continue;
+      }
+      cells[id] = player;
+
+      bool player_won = is_player_connected(player);
+
+      cells[id] = NONE;
+
+      if (player_won) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+bool Board::can_player_win_in_one_move_op_turn(const Player player,
+                                               bool perfect_op) {
+  Player opponent = opposite_player(player);
+
+  for (int row = 0; row < size; row++) {
+    for (int col = 0; col < size; col++) {
+      int id = row * size + col;
+      if (cells[id] != NONE) {
+        continue;
+      }
+      cells[id] = opponent;
+
+      bool opponent_won = is_player_connected(opponent);
+      bool player_wins =
+          !opponent_won && can_player_win_in_one_move_p_turn(player);
+
+      cells[id] = NONE;
+
+      if (perfect_op && !player_wins) {
+        return false;
+      }
+      if (!perfect_op && player_wins) {
+        return true;
+      }
+    }
+  }
+  if (perfect_op) {
+    return true;
+  }
+  return false;
+}
+
+bool Board::can_player_win_in_one_move(const Player player, bool perfect_op) {
+  assert(player != NONE);
+  Player turn = curr_turn();
+
+  bool all_occupied = red_count + blue_count == size * size;
+  Player opponent = opposite_player(player);
+
+  if (all_occupied || is_player_connected(opponent) ||
+      is_player_connected(player)) {
+    return false;
+  }
+
+  int &curr_turn_count = curr_player_count();
+  curr_turn_count++;
+  bool can_win;
+  if (turn == player) {
+    can_win = can_player_win_in_one_move_p_turn(player);
+  } else {
+    can_win = can_player_win_in_one_move_op_turn(player, perfect_op);
+  }
+  curr_turn_count--;
+
+  return can_win;
+}
+bool Board::can_player_win_in_two_moves([[maybe_unused]] const Player player,
+                                        [[maybe_unused]] bool perfect_op) {
+  return false;
 }
