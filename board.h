@@ -26,6 +26,20 @@ struct Board {
   int red_count;
   int blue_count;
 
+  bool red_connected, blue_connected;
+  bool created_visited, created_moves;
+
+  std::vector<bool> base_visited;
+  std::vector<int> sensible_moves;
+  std::vector<int> useless_moves;
+
+  void create_visited();
+  void create_moves();
+
+  std::vector<bool> &get_visited();
+  std::vector<int> &get_sensible_moves();
+  std::vector<int> &get_useless_moves();
+
   // we just assume every board is of max size
   // after, parsing the input, we will shrink it
   Board();
@@ -64,27 +78,21 @@ struct Board {
 
   bool is_victory_legal(const Player player);
 
-  void move_positions(std::vector<int> &positions);
-
-  bool skip_move(const int id);
+  bool sensible_move(const int id);
   bool has_neighbor(const int id);
   int &curr_player_count();
   bool can_player_win_in_one_move(const Player player, bool perfect_op);
 
-  bool can_player_win_in_one_move_p_turn(std::vector<int> &positions,
-                                         std::vector<bool> &visited,
+  bool can_player_win_in_one_move_p_turn(std::vector<bool> &visited,
                                          const Player player);
 
-  bool can_player_win_in_one_move_op_turn(std::vector<int> &positions,
-                                          std::vector<bool> &visited,
+  bool can_player_win_in_one_move_op_turn(std::vector<bool> &visited,
                                           const Player player, bool perfect_op);
 
-  bool can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
-                                          std::vector<bool> &visited,
+  bool can_player_win_in_two_moves_p_turn(std::vector<bool> &visited,
                                           const Player player, bool perfect_op);
 
-  bool can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
-                                           std::vector<bool> &visited,
+  bool can_player_win_in_two_moves_op_turn(std::vector<bool> &visited,
                                            const Player player,
                                            bool perfect_op);
 

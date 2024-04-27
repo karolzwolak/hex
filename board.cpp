@@ -18,7 +18,9 @@ Player opposite_player(Player player) {
   return NONE;
 }
 
-Board::Board() : size(0), cells({}), red_count(0), blue_count(0) {}
+Board::Board()
+    : size(0), cells({}), red_count(0), blue_count(0), created_visited(false),
+      created_moves(false) {}
 
 Board::Board(const Board &other) {
   size = other.size;
@@ -27,9 +29,45 @@ Board::Board(const Board &other) {
   blue_count = other.blue_count;
 }
 
+void Board::create_moves() {
+  if (created_moves) {
+    return;
+  }
+  int len = size * size;
+  for (int i = 0; i < len; i++) {
+    if (cells[i] != NONE) {
+      continue;
+    }
+    if (sensible_move(i)) {
+      sensible_moves.push_back(i);
+    } else {
+      useless_moves.push_back(i);
+    }
+  }
+  for (int id : sensible_moves) {
+    useless_moves.push_back(id);
+  }
+}
+
+void Board::create_visited() {
+  if (created_visited) {
+    return;
+  }
+  base_visited.resize(size * size, false);
+  created_visited = true;
+
+  red_connected = is_player_connected_with_visited(RED, base_visited);
+  blue_connected = is_player_connected_with_visited(BLUE, base_visited);
+}
+
 void Board::reset() {
   red_count = 0;
   blue_count = 0;
+  created_moves = false;
+  sensible_moves.clear();
+  useless_moves.clear();
+
+  created_visited = false;
 }
 
 // assumes first line "---" is consumed
@@ -158,8 +196,8 @@ int Board::neighbors(const int id, int (&arr_out)[6]) {
   return count;
 }
 bool Board::is_player_connected(const Player player) {
-  std::vector<bool> visited(size * size, false);
-  return is_player_connected_with_visited(player, visited);
+  create_visited();
+  return player == RED ? red_connected : blue_connected;
 }
 
 bool Board::is_player_connected_with_visited(const Player player,
@@ -293,6 +331,8 @@ bool Board::is_victory_legal(const Player player) {
   int &player_count = player == RED ? red_count : blue_count;
   player_count--;
 
+  std::vector<bool> visited(size * size, false);
+
   for (int row = 0; row < size; row++) {
     for (int col = 0; col < size; col++) {
       int id = row * size + col;
@@ -301,13 +341,15 @@ bool Board::is_victory_legal(const Player player) {
       }
       cells[id] = NONE;
 
-      if (!is_player_connected(player)) {
-        cells[id] = player;
+      visited.assign(visited.size(), false);
+      bool is_connected = is_player_connected_with_visited(player, visited);
+
+      cells[id] = player;
+
+      if (!is_connected) {
         player_count++;
         return true;
       }
-
-      cells[id] = player;
     }
   }
   player_count++;
@@ -365,30 +407,17 @@ bool Board::has_neighbor(const int id) {
 
   return false;
 }
-bool Board::skip_move(const int id) {
-  return cells[id] != NONE || !has_neighbor(id);
-}
+bool Board::sensible_move(const int id) { return has_neighbor(id); }
+
 int &Board::curr_player_count() {
   return curr_turn() == RED ? red_count : blue_count;
 }
 
-void Board::move_positions(std::vector<int> &positions) {
-  int len = size * size;
-
-  for (int i = 0; i < len; i++) {
-    if (skip_move(i)) {
-      continue;
-    }
-    positions.push_back(i);
-  }
-}
-
-bool Board::can_player_win_in_one_move_p_turn(std::vector<int> &positions,
-                                              std::vector<bool> &visited,
+bool Board::can_player_win_in_one_move_p_turn(std::vector<bool> &visited,
                                               const Player player) {
   std::vector<int> id_stack;
 
-  for (int id : positions) {
+  for (int id : sensible_moves) {
     if (cells[id] != NONE) {
       continue;
     }
@@ -408,15 +437,16 @@ bool Board::can_player_win_in_one_move_p_turn(std::vector<int> &positions,
   }
   return false;
 }
-bool Board::can_player_win_in_one_move_op_turn(std::vector<int> &positions,
-                                               std::vector<bool> &visited,
+bool Board::can_player_win_in_one_move_op_turn(std::vector<bool> &visited,
                                                const Player player,
                                                bool perfect_op) {
   std::vector<int> id_stack;
 
   Player opponent = opposite_player(player);
+  std::vector<int> &op_move_positions =
+      perfect_op ? sensible_moves : useless_moves;
 
-  for (int id : positions) {
+  for (int id : op_move_positions) {
     if (cells[id] != NONE) {
       continue;
     }
@@ -430,8 +460,8 @@ bool Board::can_player_win_in_one_move_op_turn(std::vector<int> &positions,
     if (!opponent_won && visited_copy.empty()) {
       visited_copy = visited;
     }
-    bool player_wins = !opponent_won && can_player_win_in_one_move_p_turn(
-                                            positions, visited_copy, player);
+    bool player_wins = !opponent_won &&
+                       can_player_win_in_one_move_p_turn(visited_copy, player);
 
     cells[id] = NONE;
 
@@ -455,38 +485,34 @@ bool Board::can_player_win_in_one_move(const Player player, bool perfect_op) {
   bool all_occupied = red_count + blue_count == size * size;
   Player opponent = opposite_player(player);
 
-  std::vector<bool> visited(size * size, false);
-  bool player_won = is_player_connected_with_visited(player, visited);
-  bool op_won =
-      !player_won && is_player_connected_with_visited(opponent, visited);
+  bool player_won = is_player_connected(player);
+  bool op_won = is_player_connected(opponent);
 
   if (all_occupied || player_won || op_won) {
     return false;
   }
 
-  std::vector<int> positions;
-  move_positions(positions);
+  create_moves();
 
   int &curr_turn_count = curr_player_count();
   curr_turn_count++;
   bool can_win;
   if (turn == player) {
-    can_win = can_player_win_in_one_move_p_turn(positions, visited, player);
+    can_win = can_player_win_in_one_move_p_turn(base_visited, player);
   } else {
-    can_win = can_player_win_in_one_move_op_turn(positions, visited, player,
-                                                 perfect_op);
+    can_win =
+        can_player_win_in_one_move_op_turn(base_visited, player, perfect_op);
   }
   curr_turn_count--;
 
   return can_win;
 }
-bool Board::can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
-                                               std::vector<bool> &visited,
+bool Board::can_player_win_in_two_moves_p_turn(std::vector<bool> &visited,
                                                const Player player,
                                                bool perfect_op) {
   std::vector<int> id_stack;
 
-  for (int id : positions) {
+  for (int id : sensible_moves) {
     if (cells[id] != NONE) {
       continue;
     }
@@ -500,7 +526,7 @@ bool Board::can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
       visited_copy = visited;
 
     bool can_win = !won && can_player_win_in_one_move_op_turn(
-                               positions, visited_copy, player, perfect_op);
+                               visited_copy, player, perfect_op);
 
     cells[id] = NONE;
 
@@ -510,14 +536,15 @@ bool Board::can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
   }
   return false;
 }
-bool Board::can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
-                                                std::vector<bool> &visited,
+bool Board::can_player_win_in_two_moves_op_turn(std::vector<bool> &visited,
                                                 const Player player,
                                                 bool perfect_op) {
   Player opponent = opposite_player(player);
   std::vector<int> id_stack;
+  std::vector<int> &op_move_positions =
+      perfect_op ? sensible_moves : useless_moves;
 
-  for (int id : positions) {
+  for (int id : op_move_positions) {
     if (cells[id] != NONE) {
       continue;
     }
@@ -531,8 +558,8 @@ bool Board::can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
       visited_copy = visited;
 
     bool player_can_win =
-        !opponent_won && can_player_win_in_two_moves_p_turn(
-                             positions, visited_copy, player, perfect_op);
+        !opponent_won &&
+        can_player_win_in_two_moves_p_turn(visited_copy, player, perfect_op);
 
     cells[id] = NONE;
 
@@ -555,27 +582,25 @@ bool Board::can_player_win_in_two_moves(const Player player, bool perfect_op) {
   bool all_occupied = red_count + blue_count == size * size;
   Player opponent = opposite_player(player);
 
-  std::vector<bool> visited(size * size, false);
-  bool player_won = is_player_connected_with_visited(player, visited);
-  bool op_won =
-      !player_won && is_player_connected_with_visited(opponent, visited);
+  bool player_won = is_player_connected(player);
+  bool op_won = is_player_connected(opponent);
 
   if (all_occupied || player_won || op_won) {
     return false;
   }
 
-  std::vector<int> positions;
-  move_positions(positions);
+  create_moves();
 
   int &curr_turn_count = curr_player_count();
   curr_turn_count++;
   bool can_win;
+
   if (turn == player) {
-    can_win = can_player_win_in_two_moves_p_turn(positions, visited, player,
-                                                 perfect_op);
+    can_win =
+        can_player_win_in_two_moves_p_turn(base_visited, player, perfect_op);
   } else {
-    can_win = can_player_win_in_two_moves_op_turn(positions, visited, player,
-                                                  perfect_op);
+    can_win =
+        can_player_win_in_two_moves_op_turn(base_visited, player, perfect_op);
   }
   curr_turn_count--;
 
