@@ -1,6 +1,6 @@
 all :build
 
 build:
-	g++ *.cpp -g -o main -Wall -Wextra -Werror
+	g++ *.cpp -g2 -g -o main -Wall -Wextra -Werror
 run: build
 	./main

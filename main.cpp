@@ -70,13 +70,16 @@ void command(Board &board, char *cmd) {
     if (one_move) {
       res = board.can_player_win_in_one_move(player, perfect_op);
     } else if (two_move) {
-      std::cout << "(unimplemented) ";
       res = board.can_player_win_in_two_moves(player, perfect_op);
     } else {
       std::cerr << "Invalid command: " << cmd << "\n";
       return;
     }
-    std::cout << (int)res;
+    if (res) {
+      std::cout << "YES";
+    } else {
+      std::cout << "NO";
+    }
   }
   std::cout << "\n";
 }
