@@ -33,6 +33,7 @@ void Board::create_moves() {
   if (created_moves) {
     return;
   }
+  created_moves = true;
   int len = size * size;
   for (int i = 0; i < len; i++) {
     if (cells[i] != NONE) {
@@ -88,7 +89,7 @@ void Board::parse_from_stdin() {
       }
       // skip "< "
       i += 2;
-      Player p;
+      Player p = NONE;
 
       switch (buffer[i]) {
       case 'r':
