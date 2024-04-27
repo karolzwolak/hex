@@ -49,10 +49,19 @@ struct Board {
   int is_id_dest_side(const int id, const Player player);
   int is_id_start_side(const int id, const Player player);
 
-  bool is_player_connected_at(const Player player, const int id,
-                              std::vector<bool> &visited,
-                              std::vector<int> &id_stack);
+  bool is_player_connected_from_start(const Player player, const int id,
+                                      std::vector<bool> &visited,
+                                      std::vector<int> &id_stack);
   bool is_player_connected(const Player player);
+
+  bool is_player_connected_with_visited(const Player player,
+                                        std::vector<bool> &visited);
+
+  bool is_player_connected_partial(const Player player, const int id,
+                                   std::vector<bool> &visited,
+                                   std::vector<bool> &visited_copy,
+                                   std::vector<int> &id_stack);
+
   bool is_victory_legal(const Player player);
 
   void move_positions(std::vector<int> &positions);
@@ -63,14 +72,21 @@ struct Board {
   bool can_player_win_in_one_move(const Player player, bool perfect_op);
 
   bool can_player_win_in_one_move_p_turn(std::vector<int> &positions,
+                                         std::vector<bool> &visited,
                                          const Player player);
+
   bool can_player_win_in_one_move_op_turn(std::vector<int> &positions,
+                                          std::vector<bool> &visited,
                                           const Player player, bool perfect_op);
 
   bool can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
+                                          std::vector<bool> &visited,
                                           const Player player, bool perfect_op);
+
   bool can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
+                                           std::vector<bool> &visited,
                                            const Player player,
                                            bool perfect_op);
+
   bool can_player_win_in_two_moves(const Player player, bool perfect_op);
 };

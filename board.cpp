@@ -158,11 +158,16 @@ int Board::neighbors(const int id, int (&arr_out)[6]) {
   return count;
 }
 bool Board::is_player_connected(const Player player) {
+  std::vector<bool> visited(size * size, false);
+  return is_player_connected_with_visited(player, visited);
+}
+
+bool Board::is_player_connected_with_visited(const Player player,
+                                             std::vector<bool> &visited) {
   assert(player != NONE);
   if (size == 1) {
     return cells[0] == player;
   }
-  std::vector<bool> visited(size * size, false);
   std::vector<int> id_stack;
   id_stack.reserve(player_count(player));
 
@@ -181,15 +186,15 @@ bool Board::is_player_connected(const Player player) {
       continue;
     }
 
-    if (is_player_connected_at(player, id, visited, id_stack))
+    if (is_player_connected_from_start(player, id, visited, id_stack))
       return true;
   }
   return false;
 }
 
-bool Board::is_player_connected_at(const Player player, const int id,
-                                   std::vector<bool> &visited,
-                                   std::vector<int> &id_stack) {
+bool Board::is_player_connected_from_start(const Player player, const int id,
+                                           std::vector<bool> &visited,
+                                           std::vector<int> &id_stack) {
   visited[id] = true;
   id_stack.push_back(id);
 
@@ -209,12 +214,47 @@ bool Board::is_player_connected_at(const Player player, const int id,
         continue;
       }
 
-      visited[id] = true;
+      visited[n] = true;
       id_stack.push_back(n);
     }
   }
 
   return false;
+}
+bool Board::is_player_connected_partial(const Player player, const int id,
+                                        std::vector<bool> &visited,
+                                        std::vector<bool> &visited_copy,
+                                        std::vector<int> &id_stack) {
+  // any visited cell is connected to start
+  // because we saved visited cells after inital check
+  // so, if id does not have a neighbor pawn that is visited
+  // it is not connected to start
+  // so we return, and do not mark it as visited
+  // so it can be visited again in the future
+
+  bool has_visited_neighbor = is_id_start_side(id, player);
+
+  int adj[6];
+  int n_count = neighbors(id, adj);
+  for (int i = 0; i < n_count; i++) {
+    int n = adj[i];
+    has_visited_neighbor =
+        has_visited_neighbor || (visited[n] && cells[n] == player);
+
+    if (has_visited_neighbor) {
+      break;
+    }
+  }
+  if (!has_visited_neighbor) {
+    return false;
+  }
+  int len = size * size;
+  visited_copy.reserve(len);
+  for (int i = 0; i < size; i++) {
+    visited_copy[i] = visited[i];
+  }
+
+  return is_player_connected_from_start(player, id, visited, id_stack);
 }
 
 Player Board::curr_turn() {
@@ -344,7 +384,10 @@ void Board::move_positions(std::vector<int> &positions) {
 }
 
 bool Board::can_player_win_in_one_move_p_turn(std::vector<int> &positions,
+                                              std::vector<bool> &visited,
                                               const Player player) {
+  std::vector<int> id_stack;
+
   for (int id : positions) {
     if (cells[id] != NONE) {
       continue;
@@ -352,7 +395,10 @@ bool Board::can_player_win_in_one_move_p_turn(std::vector<int> &positions,
 
     cells[id] = player;
 
-    bool player_won = is_player_connected(player);
+    std::vector<bool> visited_copy;
+
+    bool player_won = is_player_connected_partial(player, id, visited,
+                                                  visited_copy, id_stack);
 
     cells[id] = NONE;
 
@@ -363,8 +409,11 @@ bool Board::can_player_win_in_one_move_p_turn(std::vector<int> &positions,
   return false;
 }
 bool Board::can_player_win_in_one_move_op_turn(std::vector<int> &positions,
+                                               std::vector<bool> &visited,
                                                const Player player,
                                                bool perfect_op) {
+  std::vector<int> id_stack;
+
   Player opponent = opposite_player(player);
 
   for (int id : positions) {
@@ -373,9 +422,16 @@ bool Board::can_player_win_in_one_move_op_turn(std::vector<int> &positions,
     }
     cells[id] = opponent;
 
-    bool opponent_won = is_player_connected(opponent);
-    bool player_wins =
-        !opponent_won && can_player_win_in_one_move_p_turn(positions, player);
+    std::vector<bool> visited_copy;
+
+    bool opponent_won = is_player_connected_partial(opponent, id, visited,
+                                                    visited_copy, id_stack);
+
+    if (!opponent_won && visited_copy.empty()) {
+      visited_copy = visited;
+    }
+    bool player_wins = !opponent_won && can_player_win_in_one_move_p_turn(
+                                            positions, visited_copy, player);
 
     cells[id] = NONE;
 
@@ -399,8 +455,12 @@ bool Board::can_player_win_in_one_move(const Player player, bool perfect_op) {
   bool all_occupied = red_count + blue_count == size * size;
   Player opponent = opposite_player(player);
 
-  if (all_occupied || is_player_connected(opponent) ||
-      is_player_connected(player)) {
+  std::vector<bool> visited(size * size, false);
+  bool player_won = is_player_connected_with_visited(player, visited);
+  bool op_won =
+      !player_won && is_player_connected_with_visited(opponent, visited);
+
+  if (all_occupied || player_won || op_won) {
     return false;
   }
 
@@ -411,26 +471,36 @@ bool Board::can_player_win_in_one_move(const Player player, bool perfect_op) {
   curr_turn_count++;
   bool can_win;
   if (turn == player) {
-    can_win = can_player_win_in_one_move_p_turn(positions, player);
+    can_win = can_player_win_in_one_move_p_turn(positions, visited, player);
   } else {
-    can_win = can_player_win_in_one_move_op_turn(positions, player, perfect_op);
+    can_win = can_player_win_in_one_move_op_turn(positions, visited, player,
+                                                 perfect_op);
   }
   curr_turn_count--;
 
   return can_win;
 }
 bool Board::can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
+                                               std::vector<bool> &visited,
                                                const Player player,
                                                bool perfect_op) {
+  std::vector<int> id_stack;
+
   for (int id : positions) {
     if (cells[id] != NONE) {
       continue;
     }
     cells[id] = player;
 
-    bool can_win =
-        !is_player_connected(player) &&
-        can_player_win_in_one_move_op_turn(positions, player, perfect_op);
+    std::vector<bool> visited_copy;
+
+    bool won = is_player_connected_partial(player, id, visited, visited_copy,
+                                           id_stack);
+    if (!won && visited_copy.empty())
+      visited_copy = visited;
+
+    bool can_win = !won && can_player_win_in_one_move_op_turn(
+                               positions, visited_copy, player, perfect_op);
 
     cells[id] = NONE;
 
@@ -441,9 +511,11 @@ bool Board::can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
   return false;
 }
 bool Board::can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
+                                                std::vector<bool> &visited,
                                                 const Player player,
                                                 bool perfect_op) {
   Player opponent = opposite_player(player);
+  std::vector<int> id_stack;
 
   for (int id : positions) {
     if (cells[id] != NONE) {
@@ -451,10 +523,16 @@ bool Board::can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
     }
     cells[id] = opponent;
 
-    bool opponent_won = is_player_connected(opponent);
+    std::vector<bool> visited_copy;
+
+    bool opponent_won = is_player_connected_partial(opponent, id, visited,
+                                                    visited_copy, id_stack);
+    if (!opponent_won && visited_copy.empty())
+      visited_copy = visited;
+
     bool player_can_win =
-        !opponent_won && !is_player_connected(player) &&
-        can_player_win_in_two_moves_p_turn(positions, player, perfect_op);
+        !opponent_won && can_player_win_in_two_moves_p_turn(
+                             positions, visited_copy, player, perfect_op);
 
     cells[id] = NONE;
 
@@ -477,8 +555,12 @@ bool Board::can_player_win_in_two_moves(const Player player, bool perfect_op) {
   bool all_occupied = red_count + blue_count == size * size;
   Player opponent = opposite_player(player);
 
-  if (all_occupied || is_player_connected(opponent) ||
-      is_player_connected(player)) {
+  std::vector<bool> visited(size * size, false);
+  bool player_won = is_player_connected_with_visited(player, visited);
+  bool op_won =
+      !player_won && is_player_connected_with_visited(opponent, visited);
+
+  if (all_occupied || player_won || op_won) {
     return false;
   }
 
@@ -489,10 +571,11 @@ bool Board::can_player_win_in_two_moves(const Player player, bool perfect_op) {
   curr_turn_count++;
   bool can_win;
   if (turn == player) {
-    can_win = can_player_win_in_two_moves_p_turn(positions, player, perfect_op);
+    can_win = can_player_win_in_two_moves_p_turn(positions, visited, player,
+                                                 perfect_op);
   } else {
-    can_win =
-        can_player_win_in_two_moves_op_turn(positions, player, perfect_op);
+    can_win = can_player_win_in_two_moves_op_turn(positions, visited, player,
+                                                  perfect_op);
   }
   curr_turn_count--;
 
