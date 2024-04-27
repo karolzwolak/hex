@@ -41,12 +41,16 @@ void Board::create_moves() {
     }
     if (sensible_move(i)) {
       sensible_moves.push_back(i);
+      player_moves.push_back(i);
     } else {
-      useless_moves.push_back(i);
+      naive_op_moves.push_back(i);
     }
   }
+  for (int id : naive_op_moves) {
+    player_moves.push_back(id);
+  }
   for (int id : sensible_moves) {
-    useless_moves.push_back(id);
+    naive_op_moves.push_back(id);
   }
 }
 
@@ -66,7 +70,7 @@ void Board::reset() {
   blue_count = 0;
   created_moves = false;
   sensible_moves.clear();
-  useless_moves.clear();
+  naive_op_moves.clear();
 
   created_visited = false;
 }
@@ -445,7 +449,7 @@ bool Board::can_player_win_in_one_move_op_turn(std::vector<bool> &visited,
 
   Player opponent = opposite_player(player);
   std::vector<int> &op_move_positions =
-      perfect_op ? sensible_moves : useless_moves;
+      perfect_op ? sensible_moves : naive_op_moves;
 
   for (int id : op_move_positions) {
     if (cells[id] != NONE) {
@@ -513,7 +517,8 @@ bool Board::can_player_win_in_two_moves_p_turn(std::vector<bool> &visited,
                                                bool perfect_op) {
   std::vector<int> id_stack;
 
-  for (int id : sensible_moves) {
+  // for (int id : sensible_moves) {
+  for (int id : player_moves) {
     if (cells[id] != NONE) {
       continue;
     }
@@ -543,7 +548,7 @@ bool Board::can_player_win_in_two_moves_op_turn(std::vector<bool> &visited,
   Player opponent = opposite_player(player);
   std::vector<int> id_stack;
   std::vector<int> &op_move_positions =
-      perfect_op ? sensible_moves : useless_moves;
+      perfect_op ? sensible_moves : naive_op_moves;
 
   for (int id : op_move_positions) {
     if (cells[id] != NONE) {

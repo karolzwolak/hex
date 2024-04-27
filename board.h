@@ -31,14 +31,11 @@ struct Board {
 
   std::vector<bool> base_visited;
   std::vector<int> sensible_moves;
-  std::vector<int> useless_moves;
+  std::vector<int> naive_op_moves;
+  std::vector<int> player_moves;
 
   void create_visited();
   void create_moves();
-
-  std::vector<bool> &get_visited();
-  std::vector<int> &get_sensible_moves();
-  std::vector<int> &get_useless_moves();
 
   // we just assume every board is of max size
   // after, parsing the input, we will shrink it
