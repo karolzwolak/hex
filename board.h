@@ -62,11 +62,15 @@ struct Board {
   int &curr_player_count();
   bool can_player_win_in_one_move(const Player player, bool perfect_op);
 
-  bool can_player_win_in_one_move_p_turn(const Player player);
-  bool can_player_win_in_one_move_op_turn(const Player player, bool perfect_op);
+  bool can_player_win_in_one_move_p_turn(std::vector<int> &positions,
+                                         const Player player);
+  bool can_player_win_in_one_move_op_turn(std::vector<int> &positions,
+                                          const Player player, bool perfect_op);
 
-  bool can_player_win_in_two_moves_p_turn(const Player player, bool perfect_op);
-  bool can_player_win_in_two_moves_op_turn(const Player player,
+  bool can_player_win_in_two_moves_p_turn(std::vector<int> &positions,
+                                          const Player player, bool perfect_op);
+  bool can_player_win_in_two_moves_op_turn(std::vector<int> &positions,
+                                           const Player player,
                                            bool perfect_op);
   bool can_player_win_in_two_moves(const Player player, bool perfect_op);
 };
